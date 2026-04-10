@@ -1,0 +1,34 @@
+server:
+  port: 10002
+
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+
+    consumer:
+      group-id: integration-group
+      auto-offset-reset: earliest
+
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+    listener:
+      concurrency: 3
+
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driverClassName: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+topics:
+  inventory: inventory-topic
+  po: po-topic
+  so: so-topic
+  media: media-topic
+  checklist: checklist-topic
+  location: location-topic

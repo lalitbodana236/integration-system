@@ -1,0 +1,25 @@
+server:
+  port: 10001
+
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+    admin:
+      auto-create: true
+
+topics:
+  inventory: inventory-topic
+  po: po-topic
+  so: so-topic
+  media: media-topic
+  checklist: checklist-topic
+  location: location-topic
+
+logging:
+  level:
+    org.springframework.kafka: DEBUG
