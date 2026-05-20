@@ -750,3 +750,399 @@ Why used:
 Alternative:
 
 - `sendAsync(...)` for higher test-generator throughput.
+
+## 14. Java Beginner Tutorial (Mini Book)
+
+This section teaches Java basics using examples from this project.
+
+## 14.1 Java Building Blocks
+
+### Class
+
+- A class is a blueprint.
+- Example: `IntegrationLoadTest` is a class.
+
+### Object
+
+- An object is a real instance created from a class.
+- Example: `HttpClient CLIENT = HttpClient.newBuilder()...build();`
+
+### Method
+
+- A method is a function inside a class.
+- Example: `sendRequest(...)`, `resolveRegion(...)`, `printSummary(...)`.
+
+### Variable
+
+- A variable stores data.
+- Example: `REQUESTS_PER_API`, `SUCCESS`, `TOTAL_LATENCY`.
+
+## 14.2 Important Java Types Used in This Project
+
+### `String`
+
+- Text data.
+- Used for topic names, IDs, payloads.
+
+### `List<T>`
+
+- Ordered collection.
+- Used for API list and batch Kafka records.
+
+### `Map<K,V>`
+
+- Key-value storage.
+- Used for metadata in events.
+
+### `Instant`
+
+- Timestamp in UTC.
+- Used for event creation time and DB audit fields.
+
+### `AtomicInteger` / `AtomicLong`
+
+- Thread-safe counters for concurrent updates.
+- Used in load test metrics.
+
+### `ExecutorService`
+
+- Thread pool manager.
+- Used to generate concurrent load.
+
+## 14.3 Concurrency Basics
+
+### Why concurrency matters here
+
+- Integration platforms receive many requests at once.
+- We simulate and handle parallel work.
+
+### Used tools
+
+1. `Executors.newFixedThreadPool(THREAD_POOL_SIZE)`:
+- Creates fixed number of worker threads.
+2. `CountDownLatch`:
+- Waits until all tasks complete.
+3. `Atomic*` counters:
+- Safe increments from many threads.
+
+## 14.4 Java Error Handling
+
+### `try-catch-finally`
+
+- `try`: risky operation
+- `catch`: handle failure
+- `finally`: cleanup always executes
+
+Why used:
+
+- We must count failures/timeouts without crashing full test run.
+
+## 14.5 Java Practice Exercises
+
+1. Change `THREAD_POOL_SIZE` from `200` to `50` and compare throughput.
+2. Add one new API type in `APIS` and observe summary changes.
+3. Add a new counter for `HTTP 429` responses and print it.
+
+## 15. Spring Boot Tutorial (Mini Book)
+
+This section explains Spring Boot with this project’s real code.
+
+## 15.1 What Spring Boot Gives You
+
+- Faster app setup
+- Dependency injection
+- Embedded server
+- Convention-based configuration
+
+## 15.2 Key Annotations You Should Know
+
+### `@SpringBootApplication`
+
+- Marks main app class.
+- Enables component scanning + auto config.
+
+### `@Service`
+
+- Marks business logic class.
+- Example: `IngestionEventService`, `ProcessingService`.
+
+### `@RestController`
+
+- Marks HTTP API controller.
+- Example: ingestion controller.
+
+### `@Configuration` + `@Bean`
+
+- Manual bean configuration.
+- Example: custom `ObjectMapper`, Kafka listener factory.
+
+### `@KafkaListener`
+
+- Spring Kafka consumer listener method.
+
+### `@Transactional`
+
+- Wraps DB updates in one transaction.
+
+## 15.3 Dependency Injection (DI)
+
+What it means:
+
+- Spring creates objects and provides them to other objects automatically.
+
+Example:
+
+- `NotificationEventPublisher` needs `KafkaTemplate` and `ObjectMapper`.
+- Spring injects both in constructor.
+
+Why DI:
+
+- Cleaner code
+- Easier testing
+- Looser coupling
+
+## 15.4 Configuration Files (`application.yml`)
+
+Used for:
+
+- Kafka brokers
+- Topic names
+- DB URLs
+- Ports
+
+Why external config:
+
+- Same code can run in local/dev/prod with different settings.
+
+## 15.5 Request Lifecycle in Ingestion Service
+
+1. HTTP request enters `/api/*`
+2. Correlation filter sets `X-Correlation-Id`
+3. Controller method receives params/body/headers
+4. Event service builds envelope
+5. Producer publishes to Kafka
+6. API returns `202 Accepted`
+
+## 15.6 Global Error Handling
+
+`@RestControllerAdvice` captures exceptions and returns standard error response.
+
+Why:
+
+- Consistent API behavior
+- Easier client debugging
+
+## 15.7 Spring Boot Practice Exercises
+
+1. Add `/api/health-check` in ingestion and return simple JSON.
+2. Add request validation for empty `id`.
+3. Add one custom response header in all ingestion responses.
+
+## 16. Event-Driven Architecture Tutorial (Mini Book)
+
+## 16.1 Core Terms
+
+- Event: business signal (`order created`, `inventory updated`)
+- Producer: creates event
+- Consumer: processes event
+- Topic: event channel
+- Partition: sub-channel for scale/order
+- Consumer Group: multiple consumers share load
+- Offset: message position pointer
+
+## 16.2 Why Event-Driven Over Direct REST Chaining
+
+REST chaining:
+
+- tightly coupled
+- synchronous blocking
+- fragile under load spikes
+
+Event-driven:
+
+- asynchronous
+- decoupled
+- scalable
+- replay-friendly
+
+## 16.3 Ordering and Partition Key
+
+Why key matters:
+
+- Kafka guarantees order inside one partition only.
+
+Current approach:
+
+- partition key = `customerId` (preferred) or `region` fallback.
+
+Meaning:
+
+- same customer events stay in order.
+
+## 16.4 At-Least-Once Delivery
+
+What it means:
+
+- message may be delivered more than once.
+
+So we must:
+
+- build idempotent consumers.
+
+This project does exactly that with dedupe checks.
+
+## 16.5 Retry Pattern Used Here
+
+Flow:
+
+- main topic -> retry-5s -> retry-1m -> retry-10m -> DLQ
+
+Why this pattern:
+
+- spreads retry pressure
+- avoids immediate repeated failure loops
+
+## 16.6 DLQ Pattern
+
+DLQ stores:
+
+- original payload
+- exception
+- retry count
+- correlation ID
+- source topic
+
+Why:
+
+- safe failure storage
+- post-mortem debugging
+- replay potential
+
+## 16.7 Idempotency Pattern
+
+In plain words:
+
+- "Same event should not create duplicate side effects."
+
+How:
+
+1. Ingestion: dedupe by `eventId`
+2. Processing/Regional: dedupe by `eventId` + `requestId`
+3. Notification: dedupe by `eventId + channel`
+
+## 16.8 Event Envelope Design
+
+Common fields:
+
+- `eventId`
+- `correlationId`
+- `requestId`
+- `customerId`
+- `region`
+- `eventType`
+- `payload`
+- `retryCount`
+- `createdAt`
+
+Why envelope:
+
+- consistency across services
+- easier logging and debugging
+- future schema evolution
+
+## 16.9 Event-Driven Practice Exercises
+
+1. Add new region topic `region-eu` and route to it.
+2. Add one new retry stage `retry-30m`.
+3. Build a simple replay utility to read from DLQ topic and re-publish.
+
+## 17. Hands-On Learning Path (7 Days)
+
+## Day 1: Read and Run
+
+1. Read [API_CONTRACTS.md](C:/Users/lalit/checkouts/integration-system/API_CONTRACTS.md)
+2. Read sections 0-4 of this file
+3. Run services and `IntegrationLoadTest`
+
+Goal:
+
+- Understand full flow and basic terminology.
+
+## Day 2: Java Focus
+
+1. Study `IntegrationLoadTest.java`
+2. Modify thread count and request count
+3. Observe summary metrics impact
+
+Goal:
+
+- Learn Java concurrency basics in real workload.
+
+## Day 3: Spring Boot Focus
+
+1. Trace one endpoint from controller -> service -> producer
+2. Add one small new endpoint
+3. Verify logs include correlation id
+
+Goal:
+
+- Understand DI, annotations, and request lifecycle.
+
+## Day 4: Kafka Focus
+
+1. Watch topics in Kafka UI
+2. Send sample requests and observe topic movement
+3. Trigger failure to see retry and DLQ behavior
+
+Goal:
+
+- Understand producer/consumer and retry path.
+
+## Day 5: Persistence Focus
+
+1. Inspect MySQL workflow tables
+2. Trigger duplicate requests and confirm dedupe behavior
+3. Review indexes in entity classes
+
+Goal:
+
+- Understand state management and idempotent writes.
+
+## Day 6: Reliability Focus
+
+1. Stop one downstream service temporarily
+2. Observe retries
+3. Restart service and observe recovery
+
+Goal:
+
+- Understand resilience and eventual consistency.
+
+## Day 7: Teach Back
+
+1. Explain architecture to a peer
+2. Answer “why Kafka?”, “why idempotency?”, “why DLQ?”
+3. Propose one improvement and trade-off
+
+Goal:
+
+- Build interview-level confidence.
+
+## 18. Quick Glossary
+
+- **Asynchronous**: work happens later, not in same request thread
+- **Throughput**: requests/messages processed per second
+- **Latency**: time taken for one operation
+- **Backpressure**: system slows/queues when downstream is overloaded
+- **Idempotent**: repeat same request safely without duplicate side effects
+- **Eventually consistent**: data becomes consistent after some time, not instantly everywhere
+
+## 19. “Why We Chose This” Summary
+
+1. Kafka for decoupling + scale + replay.
+2. Idempotent consumers for safety in at-least-once delivery.
+3. Retry topics for resilient transient failure handling.
+4. DLQ for non-lossy failure capture.
+5. Correlation ID propagation for observability.
+6. MySQL for workflow correctness and queryability.
+7. NoSQL intent for high-volume payload history.
