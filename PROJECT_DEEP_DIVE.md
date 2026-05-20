@@ -2,6 +2,46 @@
 
 This document is a complete technical walkthrough of the project so you can answer architecture and implementation questions with confidence.
 
+## 0. Super Simple Explanation (Beginner Friendly)
+
+Think of this project like a **large courier system**:
+
+1. `ingestion-service` is the **front desk** that accepts parcels (API requests).
+2. Kafka is the **conveyor belt** that carries parcels between teams.
+3. `processing-service` is the **sorting center** that checks and routes parcels by country/region.
+4. `regional-service` is the **local branch office** that does region-specific work.
+5. `notification-service` is the **messaging desk** that sends email/SMS/webhook updates.
+
+### Why we use this style
+
+- If one team is slow, others can continue.
+- We can handle many requests at the same time.
+- We can retry failed work later instead of losing it.
+
+### What is Kafka in simple words
+
+Kafka is a big message pipeline:
+
+- Producer = service that sends messages
+- Consumer = service that reads messages
+- Topic = named lane in the pipeline
+- Partition = sub-lane for scale and ordering
+
+### What is idempotency in simple words
+
+Idempotency means:
+
+- "If the same request comes 2 or 3 times, do the work only once."
+
+We use an `eventId` as unique key. If key already seen, we skip duplicate.
+
+### Retry and DLQ in simple words
+
+- Retry: "Try again later" topics
+- DLQ (Dead Letter Queue): "Could not process even after retries, keep it safely for manual check"
+
+This prevents data loss and gives operations team visibility.
+
 ## 1. What This Project Is
 
 A multi-service, event-driven integration platform built with:
@@ -394,31 +434,31 @@ Where used:
 - ingestion producer
 - processing/regional/notification retry and forwarding publishers
 
-What it does:
+What it does (simple):
 
-- Sends a message to a Kafka topic asynchronously.
+- Sends one message into Kafka without waiting for complete processing.
 
-Why used:
+Why we use it:
 
-- Non-blocking publish keeps API and consumers fast.
+- Fast response to user. We do not block API while downstream services are working.
 
-Alternative:
+Other option:
 
-- `send(...).get()` (blocking) for strict synchronous behavior.
+- `send(...).get()` waits for Kafka ACK immediately (slower API but stricter sync behavior).
 
 Trade-off:
 
-- Async send is faster but requires callback/error handling.
+- Async is fast, but you must handle errors in callback.
 
 ### `ProducerRecord<String, String>`
 
-What it does:
+What it does (simple):
 
-- Represents one Kafka message with topic, key, value, and headers.
+- It is a full packet object: topic + key + body + extra headers.
 
-Why used:
+Why we use it:
 
-- Gives full control over headers (`correlationId`, `eventId`, `retryCount`, etc.).
+- We can attach tracking information (`correlationId`, `eventId`, retry info).
 
 Alternative:
 
@@ -446,13 +486,13 @@ Where used:
 
 - processing, regional, notification consumer classes
 
-What it does:
+What it does (simple):
 
-- Declares a method as a Kafka message listener.
+- Tells Spring: "Run this method whenever a new Kafka message arrives."
 
-Why used:
+Why we use it:
 
-- Spring handles consumer lifecycle, polling, and threading.
+- Much less boilerplate than raw Kafka consumer code.
 
 Alternative:
 
@@ -464,13 +504,13 @@ Trade-off:
 
 ### Batch listener (`List<ConsumerRecord<...>>`)
 
-What it does:
+What it does (simple):
 
-- Receives multiple records per poll in one method call.
+- Reads many messages together in one batch.
 
-Why used:
+Why we use it:
 
-- Better throughput and lower per-message overhead.
+- Better performance for heavy traffic.
 
 Trade-off:
 
@@ -478,13 +518,13 @@ Trade-off:
 
 ### `Acknowledgment.acknowledge()`
 
-What it does:
+What it does (simple):
 
-- Manually commits consumed offsets when processing is complete.
+- Marks messages as "finished" only after we process them.
 
-Why used:
+Why we use it:
 
-- Prevents auto-committing messages before business logic finishes.
+- Safer. If app crashes early, Kafka can re-deliver message.
 
 Alternative:
 
@@ -498,9 +538,9 @@ Trade-off:
 
 ### `retryPublisher.publish(record, event, exception)`
 
-What it does:
+What it does (simple):
 
-- Increments retry count and forwards event to next retry topic.
+- If processing fails, move message to next retry step.
 
 Why used:
 
@@ -508,9 +548,9 @@ Why used:
 
 ### `dlqPublisher.publish(record, event, exception)`
 
-What it does:
+What it does (simple):
 
-- Builds a detailed DLQ message and sends to `dlq-*` topic.
+- Stores failed message with error details in DLQ for later investigation.
 
 Why used:
 
@@ -530,9 +570,10 @@ Trade-off:
 
 ### `idempotencyService.register(eventId)`
 
-What it does:
+What it does (simple):
 
-- Returns true only for first-seen event id.
+- First time event ID -> true.
+- Same ID again -> false (duplicate).
 
 Why used:
 
@@ -556,9 +597,9 @@ Why layered:
 
 ### `objectMapper.writeValueAsString(...)`
 
-What it does:
+What it does (simple):
 
-- Converts Java object (event envelope) to JSON string.
+- Converts Java object into JSON text.
 
 Why used:
 
@@ -577,9 +618,9 @@ Why used:
 
 ### `@PostMapping(...)`
 
-What it does:
+What it does (simple):
 
-- Maps HTTP POST endpoint to Java method.
+- Connects API URL to Java method.
 
 Why used:
 
@@ -609,9 +650,9 @@ Why used:
 
 ### `CorrelationContext.getOrCreate()`
 
-What it does:
+What it does (simple):
 
-- Gets current request correlation id or generates a new one.
+- Gets tracking ID for request. Creates one if missing.
 
 Why used:
 
@@ -631,9 +672,10 @@ Why used:
 
 ### `@Transactional`
 
-What it does:
+What it does (simple):
 
-- Wraps method in DB transaction.
+- Treats multiple DB actions as one unit.
+- All succeed together or fail together.
 
 Why used:
 
@@ -667,9 +709,9 @@ Why used:
 
 ### `Executors.newFixedThreadPool(...)`
 
-What it does:
+What it does (simple):
 
-- Creates bounded worker pool for load generation.
+- Creates fixed number of worker threads to send test requests.
 
 Why used:
 
