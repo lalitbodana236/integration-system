@@ -380,3 +380,331 @@ If asked “what are trade-offs?”:
 For endpoint-level request/response contracts, see:
 
 - [API_CONTRACTS.md](C:/Users/lalit/checkouts/integration-system/API_CONTRACTS.md)
+
+## 13. Method Reference (Kafka + Java + Spring)
+
+This section is intentionally beginner-friendly. It explains the exact methods/patterns used in this project.
+
+## 13.1 Kafka Producer Methods
+
+### `kafkaTemplate.send(...)`
+
+Where used:
+
+- ingestion producer
+- processing/regional/notification retry and forwarding publishers
+
+What it does:
+
+- Sends a message to a Kafka topic asynchronously.
+
+Why used:
+
+- Non-blocking publish keeps API and consumers fast.
+
+Alternative:
+
+- `send(...).get()` (blocking) for strict synchronous behavior.
+
+Trade-off:
+
+- Async send is faster but requires callback/error handling.
+
+### `ProducerRecord<String, String>`
+
+What it does:
+
+- Represents one Kafka message with topic, key, value, and headers.
+
+Why used:
+
+- Gives full control over headers (`correlationId`, `eventId`, `retryCount`, etc.).
+
+Alternative:
+
+- `kafkaTemplate.send(topic, key, value)` without custom headers.
+
+Trade-off:
+
+- `ProducerRecord` is more verbose but much better for observability and cross-service metadata propagation.
+
+### `record.headers().add(...)`
+
+What it does:
+
+- Adds metadata headers to Kafka messages.
+
+Why used:
+
+- Carries trace context and retry metadata between services.
+
+## 13.2 Kafka Consumer Methods
+
+### `@KafkaListener(...)`
+
+Where used:
+
+- processing, regional, notification consumer classes
+
+What it does:
+
+- Declares a method as a Kafka message listener.
+
+Why used:
+
+- Spring handles consumer lifecycle, polling, and threading.
+
+Alternative:
+
+- Raw Kafka client loop (`KafkaConsumer.poll`) with manual thread management.
+
+Trade-off:
+
+- `@KafkaListener` is faster to build and maintain; raw client gives deeper custom control.
+
+### Batch listener (`List<ConsumerRecord<...>>`)
+
+What it does:
+
+- Receives multiple records per poll in one method call.
+
+Why used:
+
+- Better throughput and lower per-message overhead.
+
+Trade-off:
+
+- Slightly more complex error handling than single-record listeners.
+
+### `Acknowledgment.acknowledge()`
+
+What it does:
+
+- Manually commits consumed offsets when processing is complete.
+
+Why used:
+
+- Prevents auto-committing messages before business logic finishes.
+
+Alternative:
+
+- Auto-commit mode.
+
+Trade-off:
+
+- Manual ack is safer for correctness but requires disciplined coding.
+
+## 13.3 Retry and DLQ Methods
+
+### `retryPublisher.publish(record, event, exception)`
+
+What it does:
+
+- Increments retry count and forwards event to next retry topic.
+
+Why used:
+
+- Implements staged backoff strategy and avoids immediate hot-loop retries.
+
+### `dlqPublisher.publish(record, event, exception)`
+
+What it does:
+
+- Builds a detailed DLQ message and sends to `dlq-*` topic.
+
+Why used:
+
+- Preserves payload + error context for triage and replay.
+
+### `stacktrace(exception)` using `StringWriter`/`PrintWriter`
+
+What it does:
+
+- Converts stacktrace to text for DLQ payload.
+
+Trade-off:
+
+- Very useful for debugging but can enlarge DLQ message size.
+
+## 13.4 Idempotency Methods
+
+### `idempotencyService.register(eventId)`
+
+What it does:
+
+- Returns true only for first-seen event id.
+
+Why used:
+
+- Stops duplicate side effects at ingestion boundary.
+
+Production approach:
+
+- Redis `SETNX` (+ TTL) is preferred for distributed multi-instance safety.
+
+### Repository dedupe checks (`existsById`, `existsByRequestId`, `existsByEventIdAndChannel`)
+
+What they do:
+
+- Prevent duplicate DB writes and repeat notifications.
+
+Why layered:
+
+- Each stage is protected independently.
+
+## 13.5 Serialization Methods
+
+### `objectMapper.writeValueAsString(...)`
+
+What it does:
+
+- Converts Java object (event envelope) to JSON string.
+
+Why used:
+
+- Kafka payload format across services is JSON text.
+
+### Jackson config methods
+
+- `addModule(new JavaTimeModule())`
+- `disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)`
+
+Why used:
+
+- Ensures `Instant` fields serialize consistently and avoids timestamp-format issues.
+
+## 13.6 Spring Web Methods (Ingestion)
+
+### `@PostMapping(...)`
+
+What it does:
+
+- Maps HTTP POST endpoint to Java method.
+
+Why used:
+
+- Ingestion APIs are write operations creating asynchronous events.
+
+### `@RequestParam`, `@RequestBody`, `@RequestHeader`
+
+What they do:
+
+- Bind URL params, JSON body, and HTTP headers.
+
+Why used:
+
+- Supports id, region, customer partitioning, client event id, and trace headers.
+
+### `@ResponseStatus(HttpStatus.ACCEPTED)`
+
+What it does:
+
+- Forces HTTP `202` response.
+
+Why used:
+
+- Indicates async acceptance rather than synchronous completion.
+
+## 13.7 Correlation and Logging Methods
+
+### `CorrelationContext.getOrCreate()`
+
+What it does:
+
+- Gets current request correlation id or generates a new one.
+
+Why used:
+
+- Guarantees every event/log has trace context.
+
+### `MDC.put(...)` / `MDC.remove(...)` / `MDC.clear()`
+
+What they do:
+
+- Add/remove contextual fields to logs on the current thread.
+
+Why used:
+
+- Makes logs queryable by `correlationId`, `eventId`, etc.
+
+## 13.8 Transaction and Persistence Methods
+
+### `@Transactional`
+
+What it does:
+
+- Wraps method in DB transaction.
+
+Why used:
+
+- Keeps state updates atomic in each service stage.
+
+Trade-off:
+
+- Long transactions can reduce throughput; methods should remain focused and short.
+
+### `repository.save(...)`
+
+What it does:
+
+- Persists JPA entity.
+
+Why used:
+
+- Records workflow state and delivery status.
+
+### `@Version` (optimistic locking field)
+
+What it does:
+
+- Detects concurrent updates to same row.
+
+Why used:
+
+- Helps protect against lost updates in distributed processing.
+
+## 13.9 Concurrency and Load Test Methods
+
+### `Executors.newFixedThreadPool(...)`
+
+What it does:
+
+- Creates bounded worker pool for load generation.
+
+Why used:
+
+- Predictable concurrency pressure.
+
+### `CountDownLatch`
+
+What it does:
+
+- Waits until all request tasks finish.
+
+Why used:
+
+- Accurate total-test completion timing.
+
+### `AtomicInteger` / `AtomicLong`
+
+What they do:
+
+- Thread-safe counters under concurrency.
+
+Why used:
+
+- Correct metrics in multi-threaded load test.
+
+### `HttpClient.send(...)`
+
+What it does:
+
+- Sends HTTP request synchronously.
+
+Why used:
+
+- Simpler deterministic request/response timing per task.
+
+Alternative:
+
+- `sendAsync(...)` for higher test-generator throughput.
