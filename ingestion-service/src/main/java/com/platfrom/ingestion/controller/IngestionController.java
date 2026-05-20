@@ -1,14 +1,17 @@
 package com.platfrom.ingestion.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.platfrom.ingestion.model.BaseEvent;
-import com.platfrom.ingestion.service.KafkaProducerService;
+import com.platfrom.ingestion.model.ApiAckResponse;
+import com.platfrom.ingestion.service.IngestionEventService;
 import com.platfrom.ingestion.service.StorageService;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -17,120 +20,74 @@ import java.io.IOException;
 @RequestMapping("/api")
 @RequiredArgsConstructor
 public class IngestionController {
-    
-    private static final Logger log = LoggerFactory.getLogger(IngestionController.class);
-    
-    private final KafkaProducerService producer;
+
+    private final IngestionEventService ingestionEventService;
     private final StorageService storageService;
-    
-    private final ObjectMapper mapper = new ObjectMapper(); // reuse
-    
-    @Value("${topics.inventory}")
-    private String inventoryTopic;
-    
-    @Value("${topics.po}")
-    private String poTopic;
-    
-    @Value("${topics.so}")
-    private String soTopic;
-    
-    @Value("${topics.media}")
-    private String mediaTopic;
-    
-    @Value("${topics.checklist}")
-    private String checklistTopic;
-    
-    @Value("${topics.location}")
-    private String locationTopic;
-    
-    // ================= COMMON EVENT BUILDER =================
-    private BaseEvent build(String type, String id, String payload) {
-        return new BaseEvent(id, type, payload, System.currentTimeMillis());
-    }
-    
-    // ================= COMMON SEND METHOD =================
-    private void sendEvent(String topic, String type, String id, String payload) {
-        try {
-            BaseEvent event = build(type, id, payload);
-            String json = mapper.writeValueAsString(event);
-            
-            producer.send(topic, id, json);
-            
-            log.info("Event sent | type={} id={} topic={}", type, id, topic);
-            
-        } catch (Exception e) {
-            log.error("Failed to send event | type={} id={}", type, id, e);
-            throw new RuntimeException("Kafka publish failed", e);
-        }
-    }
-    
-    // ================= INVENTORY =================
+
     @PostMapping("/inventory")
-    public String inventory(@RequestParam String id, @RequestBody String payload) {
-        
-        log.info("Received INVENTORY request id={}", id);
-        
-        sendEvent(inventoryTopic, "INVENTORY", id, payload);
-        
-        return "Accepted INVENTORY: " + id;
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public ApiAckResponse inventory(
+            @RequestParam String id,
+            @RequestBody String payload,
+            @RequestParam(required = false) String customerId,
+            @RequestParam(required = false) String region,
+            @RequestHeader(value = "X-Event-Id", required = false) String eventId) {
+        return ingestionEventService.ingest("INVENTORY", id, payload, customerId, region, eventId);
     }
-    
-    // ================= PO =================
+
     @PostMapping("/po")
-    public String po(@RequestParam String id, @RequestBody String payload) {
-        
-        log.info("Received PO request id={}", id);
-        
-        sendEvent(poTopic, "PO", id, payload);
-        
-        return "Accepted PO: " + id;
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public ApiAckResponse po(
+            @RequestParam String id,
+            @RequestBody String payload,
+            @RequestParam(required = false) String customerId,
+            @RequestParam(required = false) String region,
+            @RequestHeader(value = "X-Event-Id", required = false) String eventId) {
+        return ingestionEventService.ingest("PO", id, payload, customerId, region, eventId);
     }
-    
-    // ================= SO =================
+
     @PostMapping("/so")
-    public String so(@RequestParam String id, @RequestBody String payload) {
-        
-        log.info("Received SO request id={}", id);
-        
-        sendEvent(soTopic, "SO", id, payload);
-        
-        return "Accepted SO: " + id;
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public ApiAckResponse so(
+            @RequestParam String id,
+            @RequestBody String payload,
+            @RequestParam(required = false) String customerId,
+            @RequestParam(required = false) String region,
+            @RequestHeader(value = "X-Event-Id", required = false) String eventId) {
+        return ingestionEventService.ingest("SO", id, payload, customerId, region, eventId);
     }
-    
-    // ================= CHECKLIST =================
+
     @PostMapping("/checklist")
-    public String checklist(@RequestParam String id, @RequestBody String payload) {
-        
-        log.info("Received CHECKLIST request id={}", id);
-        
-        sendEvent(checklistTopic, "CHECKLIST", id, payload);
-        
-        return "Accepted CHECKLIST: " + id;
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public ApiAckResponse checklist(
+            @RequestParam String id,
+            @RequestBody String payload,
+            @RequestParam(required = false) String customerId,
+            @RequestParam(required = false) String region,
+            @RequestHeader(value = "X-Event-Id", required = false) String eventId) {
+        return ingestionEventService.ingest("CHECKLIST", id, payload, customerId, region, eventId);
     }
-    
-    // ================= LOCATION =================
+
     @PostMapping("/location")
-    public String location(@RequestParam String id, @RequestBody String payload) {
-        
-        log.info("Received LOCATION request id={}", id);
-        
-        sendEvent(locationTopic, "LOCATION", id, payload);
-        
-        return "Accepted LOCATION: " + id;
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public ApiAckResponse location(
+            @RequestParam String id,
+            @RequestBody String payload,
+            @RequestParam(required = false) String customerId,
+            @RequestParam(required = false) String region,
+            @RequestHeader(value = "X-Event-Id", required = false) String eventId) {
+        return ingestionEventService.ingest("LOCATION", id, payload, customerId, region, eventId);
     }
-    
-    // ================= MEDIA =================
+
     @PostMapping("/media")
-    public String upload(
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public ApiAckResponse upload(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("id") String id) throws IOException {
-        
-        log.info("Uploading media for id={}", id);
-        
+            @RequestParam("id") String id,
+            @RequestParam(required = false) String customerId,
+            @RequestParam(required = false) String region,
+            @RequestHeader(value = "X-Event-Id", required = false) String eventId) throws IOException {
         String fileUrl = storageService.upload(file);
-        
-        sendEvent(mediaTopic, "MEDIA", id, fileUrl);
-        
-        return "Uploaded and queued: " + id;
+        return ingestionEventService.ingest("MEDIA", id, fileUrl, customerId, region, eventId);
     }
 }

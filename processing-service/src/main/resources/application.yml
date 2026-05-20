@@ -2,33 +2,51 @@ server:
   port: 10002
 
 spring:
+  application:
+    name: processing-service
   kafka:
-    bootstrap-servers: localhost:9092
-
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
-      group-id: integration-group
+      group-id: processing-consumer-group
       auto-offset-reset: earliest
-
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+        acks: all
     listener:
-      concurrency: 3
-
+      concurrency: 6
   datasource:
-    url: jdbc:h2:mem:testdb
-    driverClassName: org.h2.Driver
-    username: sa
-    password:
-
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3307}/${MYSQL_DB:processingdb}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:root}
+  data:
+    mongodb:
+      uri: mongodb://${MONGO_HOST:localhost}:${MONGO_PORT:27017}/${MONGO_DB:processingdb}
+      auto-index-creation: true
   jpa:
     hibernate:
       ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: false
+    open-in-view: false
 
-topics:
-  inventory: inventory-topic
-  po: po-topic
-  so: so-topic
-  media: media-topic
-  checklist: checklist-topic
-  location: location-topic
+platform:
+  kafka:
+    listener:
+      concurrency: 6
+    topics:
+      raw-events: raw-events
+      region-india: region-india
+      region-us: region-us
+      region-uk: region-uk
+      retry-processing-5s: retry-processing-5s
+      retry-processing-1m: retry-processing-1m
+      retry-processing-10m: retry-processing-10m
+      dlq-processing: dlq-processing

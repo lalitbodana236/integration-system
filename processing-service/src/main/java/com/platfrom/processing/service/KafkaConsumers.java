@@ -1,91 +1,84 @@
 package com.platfrom.processing.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.platfrom.processing.exception.RetryableProcessingException;
 import com.platfrom.processing.model.BaseEvent;
 import lombok.RequiredArgsConstructor;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Service;
 
-import java.net.URL;
+import java.util.List;
 
 @Service
-@RequiredArgsConstructor
+
 public class KafkaConsumers {
-    
+
     private static final Logger log = LoggerFactory.getLogger(KafkaConsumers.class);
+
+    private final ProcessingService processingService;
+    private final RetryPublisher retryPublisher;
+    private final DlqPublisher dlqPublisher;
+    private final ProcessingMetricsService metricsService;
+    private final ObjectMapper objectMapper;
     
-    private final ProcessingService service;
-    private final ObjectMapper mapper = new ObjectMapper(); // reuse
     
-    // ================= COMMON HANDLER =================
-    private void handle(String message, String topic) {
-        try {
-            BaseEvent event = mapper.readValue(message, BaseEvent.class);
-            
-            log.info("Consumed event | type={} id={} topic={}",
-                    event.getEventType(), event.getRequestId(), topic);
-            
-            service.process(event);
-            
-            // Special handling for MEDIA
-            if ("MEDIA".equalsIgnoreCase(event.getEventType())) {
-                processMedia(event);
+    public KafkaConsumers(ProcessingService processingService, RetryPublisher retryPublisher, DlqPublisher dlqPublisher, ProcessingMetricsService metricsService, ObjectMapper objectMapper) {
+        this.processingService = processingService;
+        this.retryPublisher = retryPublisher;
+        this.dlqPublisher = dlqPublisher;
+        this.metricsService = metricsService;
+        this.objectMapper = objectMapper;
+    }
+    
+    @KafkaListener(
+            topics = {
+                    "${platform.kafka.topics.raw-events}",
+                    "${platform.kafka.topics.retry-processing-5s}",
+                    "${platform.kafka.topics.retry-processing-1m}",
+                    "${platform.kafka.topics.retry-processing-10m}"
+            },
+            containerFactory = "batchKafkaListenerContainerFactory")
+    public void consume(List<ConsumerRecord<String, String>> records, Acknowledgment acknowledgment) {
+        for (ConsumerRecord<String, String> record : records) {
+            BaseEvent event = null;
+            try {
+                event = objectMapper.readValue(record.value(), BaseEvent.class);
+                enrichLoggingContext(event);
+                processingService.process(event);
+                metricsService.incrementProcessed();
+            } catch (RetryableProcessingException exception) {
+                metricsService.incrementRetry();
+                retryPublisher.publish(record, event, exception);
+            } catch (Exception exception) {
+                metricsService.incrementFailure();
+                dlqPublisher.publish(record, event, exception);
+                log.error("processing_record_failed topic={} partition={} offset={}", record.topic(), record.partition(), record.offset(), exception);
+            } finally {
+                clearLoggingContext();
             }
-            
-        } catch (Exception e) {
-            log.error("Failed to process message from topic={}", topic, e);
-            
-            // 🔥 Future: send to DLQ
         }
+        acknowledgment.acknowledge();
     }
-    
-    // ================= MEDIA PROCESSING =================
-    private void processMedia(BaseEvent event) {
-        try {
-            String fileUrl = event.getPayload();
-            
-            log.info("Processing media file: {}", fileUrl);
-            
-            byte[] data = new URL(fileUrl).openStream().readAllBytes();
-            
-            // TODO: process file (image/video/doc)
-            
-        } catch (Exception e) {
-            log.error("Media processing failed for id={}", event.getRequestId(), e);
+
+    private void enrichLoggingContext(BaseEvent event) {
+        if (event == null) {
+            return;
         }
+        MDC.put("correlationId", event.getCorrelationId());
+        MDC.put("eventId", event.getEventId());
+        MDC.put("region", event.getRegion());
+        MDC.put("retryCount", String.valueOf(event.getRetryCount()));
     }
-    
-    // ================= LISTENERS =================
-    
-    @KafkaListener(topics = "${topics.inventory}")
-    public void inventory(String message) {
-        handle(message, "inventory-topic");
-    }
-    
-    @KafkaListener(topics = "${topics.po}")
-    public void po(String message) {
-        handle(message, "po-topic");
-    }
-    
-    @KafkaListener(topics = "${topics.so}")
-    public void so(String message) {
-        handle(message, "so-topic");
-    }
-    
-    @KafkaListener(topics = "${topics.media}")
-    public void media(String message) {
-        handle(message, "media-topic");
-    }
-    
-    @KafkaListener(topics = "${topics.checklist}")
-    public void checklist(String message) {
-        handle(message, "checklist-topic");
-    }
-    
-    @KafkaListener(topics = "${topics.location}")
-    public void location(String message) {
-        handle(message, "location-topic");
+
+    private void clearLoggingContext() {
+        MDC.remove("correlationId");
+        MDC.remove("eventId");
+        MDC.remove("region");
+        MDC.remove("retryCount");
     }
 }
