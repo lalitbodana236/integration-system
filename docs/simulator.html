@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Live simulator for the integration-system distributed event-driven platform." />
+  <title>integration-system | Live Simulator</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="./index.html">
+        <span class="brand-mark">I</span>
+        <span>integration-system</span>
+      </a>
+      <nav class="nav">
+        <a href="./index.html">Landing</a>
+        <a href="./simulator.html" aria-current="page">Live Simulator</a>
+        <a href="./project.html">Project Document</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <span class="eyebrow"><span class="eyebrow-dot"></span> interactive pipeline demo</span>
+      <h1>Watch the event move through the distributed system.</h1>
+      <p class="lede">
+        Toggle the API, region, duplicate behavior, retries, and notification fan-out to show how the integration platform responds in real time.
+      </p>
+      <div class="hero-actions">
+        <button class="btn primary" id="runButton">Send event</button>
+        <button class="btn" id="seedButton">Generate new ids</button>
+        <button class="btn" id="resetButton">Reset board</button>
+      </div>
+    </section>
+
+    <section class="split">
+      <aside class="panel panel-pad">
+        <div class="control-group">
+          <div class="control-label">API selection</div>
+          <div class="control-buttons">
+            <button class="chip active" data-api="/api/po">/api/po</button>
+            <button class="chip" data-api="/api/so">/api/so</button>
+            <button class="chip" data-api="/api/inventory">/api/inventory</button>
+            <button class="chip" data-api="/api/checklist">/api/checklist</button>
+            <button class="chip" data-api="/api/location">/api/location</button>
+            <button class="chip" data-api="/api/media">/api/media</button>
+          </div>
+          <p id="apiDescription" class="subtle"></p>
+        </div>
+
+        <div class="control-group" style="margin-top: 18px;">
+          <div class="control-label">Region selection</div>
+          <div class="control-buttons">
+            <button class="chip active" data-region="INDIA">INDIA</button>
+            <button class="chip" data-region="US">US</button>
+            <button class="chip" data-region="UK">UK</button>
+          </div>
+        </div>
+
+        <div class="grid cols-2" style="margin-top: 18px;">
+          <label class="field">
+            <span class="control-label">Customer ID</span>
+            <input id="customerId" type="text" placeholder="CUST-108" />
+          </label>
+          <label class="field">
+            <span class="control-label">Event ID</span>
+            <input id="eventId" type="text" placeholder="evt-00041" />
+          </label>
+          <label class="field" style="grid-column: 1 / -1;">
+            <span class="control-label">Request ID</span>
+            <input id="requestId" type="text" placeholder="req-00041" />
+          </label>
+        </div>
+
+        <div class="toggle-row" style="margin-top: 18px;">
+          <label class="toggle">
+            <input id="duplicateToggle" type="checkbox" checked />
+            <span><strong>Duplicate request simulation</strong>Send a repeat event with the same <code>eventId</code> to demonstrate ingestion idempotency.</span>
+          </label>
+          <label class="toggle">
+            <input id="fanoutToggle" type="checkbox" checked />
+            <span><strong>Notification fan-out simulation</strong>Send to all delivery channels so the notification step looks like a real multi-channel dispatch.</span>
+          </label>
+        </div>
+
+        <div class="grid cols-2" style="margin-top: 18px;">
+          <label class="field">
+            <span class="control-label">Retry / DLQ scenario</span>
+            <select id="scenario">
+              <option value="happy">Happy path</option>
+              <option value="retry" selected>Retry then recover</option>
+              <option value="dlq">Dead-letter queue</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="control-label">Notification channels</span>
+            <select id="channelFilter">
+              <option value="all">EMAIL + SMS + WEBHOOK</option>
+              <option value="EMAIL">EMAIL only</option>
+              <option value="SMS">SMS only</option>
+              <option value="WEBHOOK">WEBHOOK only</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="codebox">
+          <div class="kicker">Request preview</div>
+          <pre id="requestPreview"></pre>
+        </div>
+        <div class="codebox">
+          <div class="kicker">Payload preview</div>
+          <pre id="payloadPreview"></pre>
+        </div>
+        <div class="codebox">
+          <div class="kicker">ACK / response preview</div>
+          <pre id="responsePreview"></pre>
+        </div>
+      </aside>
+
+      <section class="stack">
+        <article class="panel panel-pad">
+          <div class="grid cols-2" style="align-items: end;">
+            <div>
+              <span class="kicker">Pipeline visualization</span>
+              <h2 style="margin-top: 8px;">ingestion-service → Kafka → processing-service → regional-service → notification-service</h2>
+              <p class="subtle" style="margin-top: 10px;">Cards light up as the simulation moves through each stage, with retry and DLQ behavior reflected in the flow.</p>
+            </div>
+            <div class="badge-row" style="justify-content: flex-end;">
+              <span class="badge">raw-events</span>
+              <span class="badge">region-india / us / uk</span>
+              <span class="badge">notification-events</span>
+            </div>
+          </div>
+          <div id="stageGrid" class="stage-grid" style="margin-top: 18px;"></div>
+        </article>
+
+        <div class="stats-grid">
+          <article class="metric">
+            <strong id="metricAccepted">0</strong>
+            <span>Accepted</span>
+          </article>
+          <article class="metric">
+            <strong id="metricDuplicates">0</strong>
+            <span>Duplicates</span>
+          </article>
+          <article class="metric">
+            <strong id="metricProcessed">0</strong>
+            <span>Processed</span>
+          </article>
+          <article class="metric">
+            <strong id="metricRetries">0</strong>
+            <span>Retries</span>
+          </article>
+          <article class="metric">
+            <strong id="metricDlq">0</strong>
+            <span>DLQ events</span>
+          </article>
+          <article class="metric">
+            <strong id="metricFanOut">0</strong>
+            <span>Fan-out deliveries</span>
+          </article>
+          <article class="metric">
+            <strong id="metricLatency">0 ms</strong>
+            <span>Avg latency</span>
+          </article>
+          <article class="metric">
+            <strong id="metricLive">1</strong>
+            <span>Live events</span>
+          </article>
+        </div>
+
+        <div class="grid cols-2">
+          <article class="panel panel-pad">
+            <span class="kicker">Trace timeline</span>
+            <div id="timeline" class="timeline" style="margin-top: 14px;"></div>
+          </article>
+
+          <article class="panel panel-pad">
+            <span class="kicker">Event feed</span>
+            <div id="eventList" class="timeline" style="margin-top: 14px;"></div>
+          </article>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

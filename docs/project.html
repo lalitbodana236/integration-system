@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Project document page for the integration-system portfolio demo." />
+  <title>integration-system | Project Document</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="./index.html">
+        <span class="brand-mark">I</span>
+        <span>integration-system</span>
+      </a>
+      <nav class="nav">
+        <a href="./index.html">Landing</a>
+        <a href="./simulator.html">Live Simulator</a>
+        <a href="./project.html" aria-current="page">Project Document</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell doc">
+    <section>
+      <span class="eyebrow"><span class="eyebrow-dot"></span> project deep-dive</span>
+      <h1 style="margin-top: 16px;">The interview narrative for the integration platform.</h1>
+      <p class="lede">
+        This page condenses the deep-dive into something you can skim before an interview, then use the simulator to show the same story live.
+      </p>
+    </section>
+
+    <section>
+      <h3>At a glance</h3>
+      <div class="grid cols-3">
+        <article class="card"><div class="card-inner stat"><strong>HTTP ingress</strong><span>Ingestion accepts /api/po, /api/so, /api/inventory, /api/checklist, /api/location, and /api/media.</span></div></article>
+        <article class="card"><div class="card-inner stat"><strong>Kafka backbone</strong><span>Raw, retry, region, and DLQ topics move work asynchronously between services.</span></div></article>
+        <article class="card"><div class="card-inner stat"><strong>Idempotent delivery</strong><span>Duplicate protection exists at ingestion, processing, regional, and notification layers.</span></div></article>
+      </div>
+    </section>
+
+    <section>
+      <h3>Service responsibilities</h3>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th>What it does</th>
+            <th>Interview angle</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ingestion-service</td>
+            <td>Receives HTTP requests, assigns correlation IDs, dedupes on eventId, and publishes to raw-events.</td>
+            <td>Fast 202 ACK, idempotency, request normalization.</td>
+          </tr>
+          <tr>
+            <td>processing-service</td>
+            <td>Consumes raw-events, validates and persists state, then routes by region to region-india/us/uk.</td>
+            <td>Batch listener trade-offs, retries, and routing logic.</td>
+          </tr>
+          <tr>
+            <td>regional-service</td>
+            <td>Applies region-specific workflow and emits notification-events.</td>
+            <td>Localized workflow isolation and resilience.</td>
+          </tr>
+          <tr>
+            <td>notification-service</td>
+            <td>Consumes notification-events and fans out to EMAIL, SMS, and WEBHOOK.</td>
+            <td>Strategy-based fan-out and channel-level idempotency.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="grid cols-2">
+      <article>
+        <div class="card">
+          <div class="card-inner stack">
+            <h3>API contract highlights</h3>
+            <ul>
+              <li><code>POST /api/{type}</code> accepts <code>id</code>, optional <code>customerId</code>, and optional <code>region</code>.</li>
+              <li>Success returns <code>202 Accepted</code> with <code>status: ACCEPTED</code> and <code>topic: raw-events</code>.</li>
+              <li>Duplicate requests still return <code>202</code> with <code>status: DUPLICATE</code>.</li>
+              <li><code>/api/media</code> uses multipart form-data with a required file and request id.</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+      <article>
+        <div class="card">
+          <div class="card-inner stack">
+            <h3>Retry and DLQ story</h3>
+            <ul>
+              <li>Processing retry chain: <code>retry-processing-5s</code> → <code>retry-processing-1m</code> → <code>retry-processing-10m</code>.</li>
+              <li>Regional retry chain: <code>retry-region-5s</code> → <code>retry-region-1m</code> → <code>retry-region-10m</code>.</li>
+              <li>Notification retry chain: <code>retry-notification-5s</code> → <code>retry-notification-1m</code> → <code>retry-notification-10m</code>.</li>
+              <li>DLQ payloads preserve payload, stacktrace, retry count, correlation id, and source topic.</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section>
+      <h3>Why the design works</h3>
+      <div class="grid cols-2">
+        <article class="card"><div class="card-inner stat"><strong>Resilience</strong><span>Failures stay isolated and recoverable through staged retries instead of blocking the whole request path.</span></div></article>
+        <article class="card"><div class="card-inner stat"><strong>Observability</strong><span>Correlation IDs and event IDs make asynchronous debugging and demo narration much easier.</span></div></article>
+        <article class="card"><div class="card-inner stat"><strong>Scale</strong><span>Each service can scale independently, which is exactly the interview story this platform is built to tell.</span></div></article>
+        <article class="card"><div class="card-inner stat"><strong>Portfolio value</strong><span>The simulator turns an architecture discussion into something visual, interactive, and memorable.</span></div></article>
+      </div>
+    </section>
+
+    <section>
+      <h3>Interview cheat sheet</h3>
+      <div class="grid cols-2">
+        <article class="card"><div class="card-inner stat"><strong>Why Kafka?</strong><span>Decoupling, buffering, replayability, and independent scaling across service boundaries.</span></div></article>
+        <article class="card"><div class="card-inner stat"><strong>How do duplicates stay safe?</strong><span>Idempotency is layered, so each stage protects its own side effects before writing or dispatching.</span></div></article>
+        <article class="card"><div class="card-inner stat"><strong>Why retries via topics?</strong><span>Backoff is visible, controlled, and easy to reason about without tight synchronous loops.</span></div></article>
+        <article class="card"><div class="card-inner stat"><strong>What does the demo show?</strong><span>A polished end-to-end story from request acceptance to notification fan-out and failure handling.</span></div></article>
+      </div>
+    </section>
+
+    <div class="footer">Use this page to talk through architecture, then jump into the live simulator for the demo effect.</div>
+  </main>
+</body>
+</html>

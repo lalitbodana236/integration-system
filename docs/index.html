@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Portfolio-style demo for the integration-system event-driven architecture." />
+  <title>integration-system | Portfolio Demo</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="./index.html">
+        <span class="brand-mark">I</span>
+        <span>integration-system</span>
+      </a>
+      <nav class="nav">
+        <a href="./index.html" aria-current="page">Landing</a>
+        <a href="./simulator.html">Live Simulator</a>
+        <a href="./project.html">Project Document</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <span class="eyebrow"><span class="eyebrow-dot"></span> GitHub Pages-ready portfolio demo</span>
+      <h1>Distributed integration, explained like a product showcase.</h1>
+      <p class="lede">
+        This demo turns the architecture in <strong>PROJECT_DEEP_DIVE.md</strong> and <strong>API_CONTRACTS.md</strong> into a polished interview asset:
+        a dark landing page, a live event simulator, and a project document page that makes the platform easy to present.
+      </p>
+      <div class="hero-actions">
+        <a class="btn primary" href="./simulator.html">Open live simulator</a>
+        <a class="btn" href="./project.html">Read project doc</a>
+      </div>
+    </section>
+
+    <section class="grid cols-3">
+      <article class="card">
+        <div class="card-inner stat">
+          <span class="kicker">Architecture</span>
+          <strong>5 service flow</strong>
+          <span>ingestion-service → Kafka → processing-service → regional-service → notification-service</span>
+        </div>
+      </article>
+      <article class="card">
+        <div class="card-inner stat">
+          <span class="kicker">Reliability</span>
+          <strong>Idempotent by design</strong>
+          <span>Duplicate detection, staged retry topics, and DLQs keep the pipeline resilient.</span>
+        </div>
+      </article>
+      <article class="card">
+        <div class="card-inner stat">
+          <span class="kicker">Observability</span>
+          <strong>Traceable end to end</strong>
+          <span>Correlation IDs, event IDs, and live timelines make async behavior easy to explain.</span>
+        </div>
+      </article>
+    </section>
+
+    <section class="page-section">
+      <h2>How the pipeline flows</h2>
+      <p class="intro">
+        The platform behaves like an event conveyor belt. The ingestion service accepts the request, Kafka buffers it,
+        processing routes by region, the regional service executes local workflow, and notification fans out delivery.
+      </p>
+      <div class="flow">
+        <article class="node">
+          <small>1 · ingress</small>
+          <h3>ingestion-service</h3>
+          <p>Accepts API requests on <code>/api/po</code>, <code>/api/so</code>, <code>/api/inventory</code>, <code>/api/checklist</code>, <code>/api/location</code>, and <code>/api/media</code>.</p>
+        </article>
+        <article class="node">
+          <small>2 · backbone</small>
+          <h3>Kafka</h3>
+          <p>Publishes to <code>raw-events</code> and downstream retry / DLQ topics without blocking the HTTP path.</p>
+        </article>
+        <article class="node">
+          <small>3 · routing</small>
+          <h3>processing-service</h3>
+          <p>Applies validation, duplicate checks, and region routing into <code>region-india</code>, <code>region-us</code>, or <code>region-uk</code>.</p>
+        </article>
+        <article class="node">
+          <small>4 · workflow</small>
+          <h3>regional-service</h3>
+          <p>Performs regional handling and publishes <code>notification-events</code> for downstream delivery.</p>
+        </article>
+        <article class="node">
+          <small>5 · fan-out</small>
+          <h3>notification-service</h3>
+          <p>Dispatches <code>EMAIL</code>, <code>SMS</code>, and <code>WEBHOOK</code> notifications with idempotent delivery.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="grid cols-2 page-section">
+      <article class="card">
+        <div class="card-inner stack">
+          <span class="kicker">What makes it interview-friendly</span>
+          <div class="badge-row">
+            <span class="badge"><span class="dot" style="color: var(--brand-2)"></span> async and decoupled</span>
+            <span class="badge"><span class="dot" style="color: var(--brand-3)"></span> retry + DLQ story</span>
+            <span class="badge"><span class="dot" style="color: var(--warn)"></span> traceable ids</span>
+            <span class="badge"><span class="dot" style="color: var(--danger)"></span> duplicate safety</span>
+          </div>
+          <p class="subtle">
+            Use this site to narrate the trade-offs: higher operational complexity, but much better resilience, scaling, and replayability.
+          </p>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-inner stack">
+          <span class="kicker">Quick links</span>
+          <a class="btn primary" href="./simulator.html">Run a live request</a>
+          <a class="btn" href="./project.html">Open the deep-dive page</a>
+          <p class="subtle">Everything is static, self-contained, and ready to publish under <code>docs/</code> for GitHub Pages.</p>
+        </div>
+      </article>
+    </section>
+
+    <div class="footer">Built to showcase the integration platform in interviews and portfolio walkthroughs.</div>
+  </main>
+</body>
+</html>
