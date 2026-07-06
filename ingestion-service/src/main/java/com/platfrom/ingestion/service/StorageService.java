@@ -16,6 +16,7 @@ public class StorageService {
         String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
         
         Path path = Paths.get("uploads/" + fileName);
+        Files.createDirectories(path.getParent());
         Files.copy(file.getInputStream(), path);
         
         return "http://localhost:8080/files/" + fileName;
