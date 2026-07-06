@@ -61,7 +61,7 @@
           </div>
         </div>
 
-        <div class="grid cols-2" style="margin-top: 18px;">
+        <div class="field-grid two-up" style="margin-top: 18px;">
           <label class="field">
             <span class="control-label">Customer ID</span>
             <input id="customerId" type="text" placeholder="CUST-108" />
@@ -87,7 +87,7 @@
           </label>
         </div>
 
-        <div class="grid cols-2" style="margin-top: 18px;">
+        <div class="field-grid two-up" style="margin-top: 18px;">
           <label class="field">
             <span class="control-label">Retry / DLQ scenario</span>
             <select id="scenario">
@@ -126,7 +126,7 @@
           <div class="grid cols-2" style="align-items: end;">
             <div>
               <span class="kicker">Pipeline visualization</span>
-              <h2 style="margin-top: 8px;">ingestion-service → Kafka → processing-service → regional-service → notification-service</h2>
+              <h2 style="margin-top: 8px;">ingestion-service &rarr; Kafka &rarr; processing-service &rarr; regional-service &rarr; notification-service</h2>
               <p class="subtle" style="margin-top: 10px;">Cards light up as the simulation moves through each stage, with retry and DLQ behavior reflected in the flow.</p>
             </div>
             <div class="badge-row" style="justify-content: flex-end;">
