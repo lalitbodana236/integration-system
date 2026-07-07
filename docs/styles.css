@@ -374,7 +374,7 @@ h1 {
 .split {
   display: grid;
   gap: 18px;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(340px, 400px) minmax(0, 1fr);
   align-items: start;
 }
 
@@ -750,8 +750,7 @@ h1 {
   .stats-grid,
   .grid.cols-3,
   .grid.cols-2,
-  .split,
-  .field-grid.two-up {
+  .split {
     grid-template-columns: 1fr;
   }
 
@@ -760,13 +759,9 @@ h1 {
   }
 }
 
-@media (min-width: 1400px) {
-  .split {
-    grid-template-columns: minmax(360px, 420px) minmax(0, 1fr);
-  }
-
+@media (max-width: 1280px) {
   .field-grid.two-up {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 }
 
